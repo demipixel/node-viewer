@@ -1,0 +1,23 @@
+
+.node {
+  position: absolute;
+  z-index: 3;
+}
+
+.nodeconn {
+  position: absolute;
+  z-index: 2;
+  height: 2px;
+  background-color: #000000;
+  transform-origin: 0% 0%;
+}
+
+.name {
+  opacity: 0.2;
+  white-space: nowrap;
+  text-align: center;
+}
+
+.name:hover {
+  opacity: 1.0;
+}
