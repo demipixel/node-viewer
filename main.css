@@ -1,3 +1,7 @@
+#display {
+  position: relative;
+  top: 50px;
+}
 
 .node {
   position: absolute;
@@ -20,4 +24,41 @@
 
 .name:hover {
   opacity: 1.0;
+}
+
+.header .col-md-6 {
+  padding-top: 4px;
+}
+
+.header .col-md-3 {
+  padding-top: 4px;
+}
+
+.header {
+  background: #FAFAFA;
+  position: fixed;
+  top: 0;
+  z-index: 10;
+}
+
+body {
+  background: #D9C66E;
+  overflow: hidden;
+}
+
+h3 {
+  margin: 8px;
+}
+
+.noresize {
+  resize: none;
+}
+
+.slider {
+  margin-top: 10px;
+}
+
+.option-checkbox {
+  width: 30px;
+  height: 30px;
 }

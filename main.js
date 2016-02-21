@@ -1,23 +1,20 @@
-var currData = null;
-var currOpt = null;
-var showLines = true;
-var displayActive = true;
-var doCollisions = true;
-
-function toggleLines() {
-  showLines = !showLines;
-  if (showLines) $('.nodeconn').show();
-  else $('.nodeconn').hide();
-}
-
-function toggleDisplay() {
-  displayActive = !displayActive;
-}
-
-function toggleCollisions() {
-  doCollisions = !doCollisions;
-}
-
+/*
+Pass in initial data and options. Gets returned new data and options, prepared for use
+Format:
+[{
+  name: '', // Name, otherwise will look something like "Node 5"
+  size: 50, // Int size, node won't display if this is <= 0
+  connections: [3,4,8,10], // Connections to other nodes in this array, each number is the position of another node in the same array
+  connections: [{ strength: 0.5, id: 3}, { strength: 0.8, id: 4 }, ...], // Another format to include strengths
+  nonconnections: [6,9,10], // Optional, if not included will be any item NOT in connections
+  nonconnections: [{ strength: 0.1, id: 6 }, ...], // Same as with connections above
+  image: 'http://...', // URL of image, will display color if not included
+  color: '#ff0000' // Assigned randomly if not includes,
+  link: 'http://www.google.com/' // Optional, go somewhere if clicking on name
+}, {
+  ...
+}, ...]
+*/
 function process(data, opt) {
   opt = opt || {};
   setOptionDefaults(opt);
@@ -62,9 +59,10 @@ function process(data, opt) {
   return [data, opt];
 }
 
-function processPositions() {
-  var data = currData;
-  var opt = currOpt;
+/*
+Process positions of every item in data, returns nothing
+*/
+function processPositions(data, opt) {
   var falloutLength = Math.pow(opt.across*3/4, 2);
   data.forEach(function(item) {
     var moveVector = { x: 0, y: 0 };
@@ -90,16 +88,16 @@ function processPositions() {
       moveVector.x -= conn.strength/item.nonconnectionAll*deltaX*opt.nonconnMove*distanceScale*opt.speed;
       moveVector.y -= conn.strength/item.nonconnectionAll*deltaY*opt.nonconnMove*distanceScale*opt.speed;
     });
-    if (isNaN(moveVector.x) || isNaN(moveVector.y)) console.log('WE HAVE A NAN!',item);
     item.position.x += moveVector.x;
     item.position.y += moveVector.y;
-    if (doCollisions) processCollisions(item);
+    if (opt.doCollisions) processCollisions(data, opt, item);
   });
 }
 
-function processCollisions(item) {
-  var data = currData;
-  var opt = currOpt;
+/*
+Process (once) collisions of item passed in, returns true if position has not changed, false if it has
+*/
+function processCollisions(data, opt, item) {
   var oldX = item.position.x;
   var oldY = item.position.y;
   data.forEach(function (item2) {
@@ -109,7 +107,6 @@ function processCollisions(item) {
     var deltaY = item2.position.y - item.position.y;
     if (Math.sqrt(deltaX*deltaX + deltaY*deltaY) <= neededDist) {
       var angle = Math.atan2(item2.position.y - item.position.y, item2.position.x - item.position.x);
-      //console.log(deltaX,deltaY,'less than',neededDist);
       var dist = Math.sqrt(deltaX*deltaX + deltaY*deltaY) - neededDist;
 
       item.position.x += Math.cos(angle)*dist;
@@ -122,55 +119,60 @@ function processCollisions(item) {
   else return false
 }
 
-function processAllCollisions() {
+/*
+Process all collisions for all items until no more collisions or over 100 attempts
+*/
+function processAllCollisions(data, opt) {
   var count = 0;
-  if (!currData) return;
+  if (!data) return;
   while (count < 100) {
     count++;
     var changed = false;
-    currData.forEach(function(item) {
-      if (processCollisions(item)) changed = true;
+    data.forEach(function(item) {
+      if (processCollisions(data, opt, item)) changed = true;
     });
     if (changed == false) break;
   }
 }
 
+/*
+Init defaults of options, called by process()
+*/
 function setOptionDefaults(opt) {
+  opt.width = opt.width || 1000;
+  opt.height = opt.height || 500;
   var across = Math.sqrt(opt.width*opt.width + opt.height*opt.height)
   var maxRadius = 25;
   var defaults = {
-    width: 1920,
-    height: 1080,
-    across: across,
     padding: Math.floor(across/200),
     wallPadding: Math.floor(across/200),
-    sizePadding: 5,
     bottomSizeScale: false,
-    moveAmount: Math.floor(across/100),
-    nonconnMove: 1.0,
-    minRepulsion: 0.25,
+    nonconnMove: 0.6,
+    minRepulsion: 0.1,
     maxRadius: maxRadius,
     attractFalloff: Math.floor(maxRadius*2),
     attractScalar: Math.floor(maxRadius/2),
-    speed: maxRadius/20
+    speed: Math.ceil(maxRadius/10),
+    showLines: true,
+    displayActive: true,
+    doCollisions: true
   }
   for (var key in defaults) {
     if (opt[key] == undefined) opt[key] = defaults[key];
   }
+  opt.across = across;
 }
 
+/*
+Init each item of data, called by process()
+*/
 function fixData(item, data) {
   item.name = item.name == undefined ? 'Node '+item.id : item.name;
   item.size = item.size || 0;
   item.dead = item.size <= 0;
   item.position = { x: 0, y: 0 };
-  //item.connectionMin = null;
-  //item.connectionMax = null;
   item.connectionAll = 0;
-  //item.nonconnectionMin = null;
-  //item.nonconnectionMax = null;
   item.nonconnectionAll = 0;
-  //if (item.size <= 0) return false;
   item.connections = item.connections || [];
   var simpleConnections; // Without strengths, in form [3,7,4...]
   if (typeof item.connections[0] == 'number') {
@@ -195,17 +197,11 @@ function fixData(item, data) {
 
   if (!item.image && !item.color) item.color = '#'+[0,0,0,0,0,0].map(function() {
     return Math.floor(Math.random()*16).toString(16);
-  });
+  }).join('');
 
-  var minVars = ['connectionMin', 'nonconnectionMin'];
-  var maxVars = ['connectionMax', 'nonconnectionMax'];
   var allVars = ['connectionAll', 'nonconnectionAll'];
   [item.connections, item.nonconnections].forEach(function(arr, ind) {
     arr.forEach(function(conn) {
-      /*if (item[minVars[ind]] == null) item[minVars[ind]] = conn.strength;
-      else item[minVars[ind]] = Math.min(item[minVars[ind]], conn.strength);
-      if (item[maxVars[ind]] == null) item[maxVars[ind]] = conn.strength;
-      else item[maxVars[ind]] = Math.max(item[maxVars[ind]], conn.strength);*/
       item[allVars[ind]] += conn.strength;
     });
   });
@@ -214,9 +210,11 @@ function fixData(item, data) {
   return true;
 }
 
-function displayCanvas(newDisplay) {
-  var data = currData;
-  var opt = currOpt;
+/*
+Creates or edits divs (newDisplay = Recreate instead of edit) of items and lines
+You can just edit for changing positions, but you'll need newDisplay for new sizes, images, nodes, etc
+*/
+function displayCanvas(data, opt, newDisplay) {
   if (!opt || !data) return;
   var $display = $('#display');
   if (newDisplay) {
@@ -227,19 +225,20 @@ function displayCanvas(newDisplay) {
       $div.css('width', size*2+'px').css('height', size*2+'px').css('border-radius', size+'px');
       $div.css('top', item.position.y-item.scaledSize*opt.maxRadius+'px').css('left', item.position.x-item.scaledSize*opt.maxRadius+'px');
       if (item.image) $div.css('background-image', 'url("'+item.image+'")');
+      else $div.css('background', item.color);
 
       $div.css('background-size', size*2+'px '+size*2+'px');
       $display.append($div);
 
       $div.mouseover(function() {
-        if (!showLines) return;
+        if (!opt.showLines) return;
         $('.nodeconn').hide();
         $('.conn-'+$(this).data('id')).show();
         $(this).css('z-index', 8);
       });
 
       $div.mouseout(function() {
-        if (!showLines) return;
+        if (!opt.showLines) return;
         $('.nodeconn').show();
         $(this).css('z-index', 3);
       });
@@ -247,7 +246,6 @@ function displayCanvas(newDisplay) {
       item.connections.forEach(function(conn) {
         if ($('#node-'+conn.id+'-'+item.id).get(0) || !$('#node-'+conn.id).get(0)) return;
         var $line = $('<div class="nodeconn conn-'+item.id+' conn-'+conn.id+'" id="node-'+item.id+'-'+conn.id+'" data-start="'+item.id+'" data-end="'+conn.id+'"></div>');
-        if (!data[conn.id]) console.log(item.id + '-> '+conn.id);
         var deltaX = data[conn.id].position.x - item.position.x;
         var deltaY = data[conn.id].position.y - item.position.y;
         var rotate = Math.atan2(deltaX, -deltaY)-Math.PI/2;
@@ -261,13 +259,13 @@ function displayCanvas(newDisplay) {
         $display.append($line);
       });
     });
-    if (!showLines) $('.nodeconn').hide();
-  } else if (displayActive) {
+    if (!opt.showLines) $('.nodeconn').hide();
+  } else if (opt.displayActive) {
     data.forEach(function(item,index) {
       var $div = $('#node-'+item.id);
       $div.css('top', item.position.y-item.scaledSize*opt.maxRadius+'px').css('left', item.position.x-item.scaledSize*opt.maxRadius+'px');
     });
-    if (showLines) {
+    if (opt.showLines) {
       $('.nodeconn').each(function(index, nodeconn) {
         nodeconn = $(nodeconn);
         var connItem = data[nodeconn.data('end')];
@@ -286,18 +284,3 @@ function displayCanvas(newDisplay) {
     }
   }
 }
-
-function submit() {
-  var data;
-  try {
-    data = JSON.parse($('#json-input').val());
-  } catch (err) {
-    throw err;
-  }
-  var dataAndOpt = process(data, { width: 1000, height: 500, maxRadius: 60, speed: 10, nonconnMove: 0.8 });
-  currData = dataAndOpt[0];
-  currOpt = dataAndOpt[1];
-  processAllCollisions();
-  displayCanvas(true);
-}
-
