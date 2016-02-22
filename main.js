@@ -16,8 +16,7 @@ Format:
 }, ...]
 */
 function process(data, opt) {
-  opt = opt || {};
-  setOptionDefaults(opt);
+  opt = setOptionDefaults(opt);
   data.forEach(function(item, index) { item.id = index; });
   data.forEach(function(item, index) { return fixData(item, data, index); });
   data.forEach(function(item) {
@@ -136,12 +135,13 @@ function processAllCollisions(data, opt) {
 }
 
 /*
-Init defaults of options, called by process()
+Init defaults of options, called by process(), returns new options
 */
 function setOptionDefaults(opt) {
-  opt.width = opt.width || 1000;
-  opt.height = opt.height || 500;
-  var across = Math.sqrt(opt.width*opt.width + opt.height*opt.height)
+  var newOpt =  {};
+  newOpt.width = opt.width || 1000;
+  newOpt.height = opt.height || 500;
+  var across = Math.sqrt(newOpt.width*newOpt.width + newOpt.height*newOpt.height)
   var maxRadius = 25;
   var defaults = {
     padding: Math.floor(across/200),
@@ -158,9 +158,11 @@ function setOptionDefaults(opt) {
     doCollisions: true
   }
   for (var key in defaults) {
-    if (opt[key] == undefined) opt[key] = defaults[key];
+    if (opt[key] == undefined) newOpt[key] = defaults[key];
+    else newOpt[key] = opt[key];
   }
-  opt.across = across;
+  newOpt.across = across;
+  return newOpt;
 }
 
 /*

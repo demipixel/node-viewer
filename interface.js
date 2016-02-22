@@ -1,13 +1,13 @@
 var currData = null;
-var currOpt = {};
-setOptionDefaults(currOpt);
+var currOpt = setOptionDefaults({});
 setWindowSize();
 var running = false;
 var activeWindowSize = true;
 
 
 function inputJSON(fail, reason) {
-  var str = '<textarea class="form-control noresize" id="jsoninput" rows=15>'+(fail||'')+'</textarea>';
+  var str = 'Add your JSON to the textarea below. If you don\'t have any, <a target="_blank" href="http://pastebin.com/raw/Xrvy9zub">here\'s some sample JSON of my steam friends list.</a><br>';
+  str += '<textarea class="form-control noresize" id="jsoninput" rows=15>'+(fail||'')+'</textarea>';
   BootstrapDialog.show({
     type: fail ? BootstrapDialog.TYPE_DANGER : BootstrapDialog.TYPE_SUCCESS,
     title: 'JSON Input'+(fail?' - '+reason:''),
@@ -26,6 +26,10 @@ function inputJSON(fail, reason) {
           if (!data[0]) {
             currOpt = data.opt;
             data = data.data;
+            if (currOpt.width == 0 && currOpt.height == 0) {
+              activeWindowSize = true;
+              setWindowSize();
+            } else activeWindowSize = false;
           }
 
           var dataAndOpt = process(data, currOpt || {});
@@ -53,11 +57,18 @@ function inputJSON(fail, reason) {
 
 function changeOptions() {
   var sizes = [null, [500,500], [500, 1000], [1920, 1080]];
+  var currentSize = sizes.map(function(item, i) { return i; }).filter(function(i) { return i != 0 && currOpt.width==sizes[i][0] && currOpt.height==sizes[i][1]; })[0];
+  if (currentSize == undefined && !activeWindowSize) {
+    currentSize = sizes.length;
+    sizes.push([currOpt.width, currOpt.height]);
+  } else if (currentSize == undefined) {
+    currentSize = 0;
+  }
   var optionItem = function(title, inside, smaller) {
     return '<div class="col-md-12"><div class="col-md-4"><h4>'+title+'</h4></div><div class="col-md-'+(smaller?6:8)+'">'+inside+'</div>'+(smaller?'<div class="col-md-2 sliderValue"></div>':'')+'</div>';
   }
   var str = '<br>';
-  str += optionItem('Size', '<select class="form-control optionSize">'+sizes.map(function(item, i) { return '<option value='+i+'>'+(!item?'Expand To Window':item[0]+'x'+item[1])+'</option>' }).join('')+'</select>');
+  str += optionItem('Size', '<select class="form-control optionSize">'+sizes.map(function(item, i) { return '<option value='+i+' '+(i==currentSize?'selected="selected"':'')+'>'+(!item?'Expand To Window':item[0]+'x'+item[1])+'</option>' }).join('')+'</select>');
   str += optionItem('Padding', '<input class="option-slider optionPadding" data-slider-min=0 data-slider-max=50 data-slider-value='+currOpt.padding+'>', true);
   str += optionItem('Wall Padding', '<input class="option-slider optionWallPadding" data-slider-min=0 data-slider-max=100 data-slider-value='+currOpt.wallPadding+'>', true);
   str += optionItem('Scale From Zero', '<input type="checkbox" class="option-checkbox optionScaleFromZero" '+(currOpt.bottomSizeScale?'checked':'')+'>');
@@ -66,7 +77,7 @@ function changeOptions() {
   str += optionItem('Max. Radius', '<input class="option-slider optionMaxRadius" data-slider-min=0 data-slider-max=200 data-slider-value='+currOpt.maxRadius+'>', true);
   str += optionItem('Speed', '<input class="option-slider optionSpeed" data-slider-min=1 data-slider-max=500 data-slider-scale=logarithmic data-slider-value='+currOpt.speed+'>', true);
   str += optionItem('Collisions', '<input type="checkbox" class="option-checkbox optionCollisions" '+(currOpt.doCollisions?'checked':'')+'>');
-  str += Array(15).join('<br>');
+  str += Array(19).join('<br>');
   BootstrapDialog.show({
     type: BootstrapDialog.TYPE_WARNING,
     title: 'Change Options',
@@ -135,9 +146,54 @@ function exportJSON() {
   });
 }
 
+function developers() {
+  var s = '&nbsp&nbsp';
+  var str = 'If you\'re a developer, you can generate your own JSON to use in the viewer! Export your data in an array with this format:<br>';
+  str += '<code>';
+  str += '[{<br>';
+  str += s+'name: "", // Name, otherwise defaults to something like "Node 5"<br>';
+  str += s+'size: 50, // Integer size, node won\'t display if this is <= 0<br>';
+  str += s+'connections: [3,5,8...], // Connections to other nodes, each id points to value in array<br>';
+  str += s+'connections: [{ strength: 0.5, id: 3}, ...], // Another format for connections where you can include strengths<br>';
+  str += s+'nonconnnections: [4,8,3], // You can use both formats above. Default is all nodes not in "connections"<br>';
+  str += s+'image: "http://...", // Image to display on node, if none if provided, color will be displayed<br>';
+  str += s+'color: "#ff0033", // Color to be displayed if no image, assigned randomly if none provided<br>';
+  str += s+'link: "http://www.google.com/" // Link added to name if provided<br>';
+  str += '},...]<br>';
+  str += '</code>'
+  BootstrapDialog.show({
+    size: BootstrapDialog.SIZE_WIDE,
+    type: BootstrapDialog.TYPE_PRIMARY,
+    title: 'Developers <3',
+    message: str,
+    buttons: [{
+      label: 'Github',
+      cssClass: 'btn-primary',
+      action: function(dialog) {
+        var win = window.open('https://github.com/demipixel/node-viewer', '_blank');
+        win.focus();
+      }
+    }, {
+      label: 'Sounds Good',
+      action: function(dialog) {
+        dialog.close()
+      }
+    }],
+    onshown: function(dialog) {
+      var input = dialog.getModalBody().find('#jsoninput');
+      input.select();
+    }
+  });
+}
+
 function generateJSONOutput() {
+  var opt = setOptionDefaults(currOpt);
+  if (activeWindowSize) {
+    opt.width = 0;
+    opt.height = 0;
+  }
   return JSON.stringify({
-    opt: currOpt,
+    opt: opt,
     data: currData.map(function(item) {
       var obj = {
         name: item.name,
